@@ -43,6 +43,10 @@ class Vec2:
             return Vec2(self.x, self.y)
         return self * (max_length / l)
 
+    def angle(self) -> float:
+        """Return angle (in degrees) of vector relative to +x axis."""
+        return math.degrees(math.atan2(self.y, self.x))
+
 
 def integrate_velocity(position: Vec2, velocity: Vec2, acceleration: Vec2, dt: float,
                        linear_damping: float = 0.0) -> tuple[Vec2, Vec2]:
@@ -132,5 +136,3 @@ def integrate_height(z: float, vz: float, gravity: float, dt: float,
             if abs(vz) < 10.0:
                 vz = 0.0
     return z, vz
-
-

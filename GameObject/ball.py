@@ -1,5 +1,5 @@
 from Physics.physics import Vec2, integrate_velocity, clamp_to_rect, resolve_circle_vs_circle
-
+import pygame as pg
 
 class Ball:
     def __init__(self, start_pos: tuple[float, float]):
@@ -10,6 +10,13 @@ class Ball:
         self.radius = 10.0
         self.restitution_wall = 0.5
         self.linear_damping = 1.2 
+
+        self.sprite = pg.image.load('./assets/sprites/football.png').convert_alpha()
+        diameter = int(self.radius * 2)
+        self.sprite = pg.transform.smoothscale(self.sprite, (diameter, diameter))
+        self.rect = self.sprite.get_rect(center=(self.pos.x, self.pos.y))
+
+        self.angle = 0.0
 
     def kick(self, impulse_xy: tuple[float, float]):
         self.vel.x += float(impulse_xy[0])
@@ -29,6 +36,12 @@ class Ball:
 
         self.apply_drag(dt)
 
+        speed = self.vel.length()
+        spin_rate = speed * 10.0  # tweak multiplier for faster/slower spin
+        self.angle = (self.angle + spin_rate * dt) % 360
+
+        self.rect.center = (self.pos.x, self.pos.y)
+
     def collide_with_player(self, player, restitution: float = 0.3):
         p1, v1, p2, v2 = resolve_circle_vs_circle(player.pos, player.radius, player.vel, self.pos, self.radius, self.vel, restitution)
         player.pos = p1
@@ -41,3 +54,7 @@ class Ball:
         sx, sy = world_to_screen_fn(self.pos.x, self.pos.y, 0.0, camera)
         pg.draw.circle(surface, (240, 240, 240), (sx, sy), int(self.radius))
         pg.draw.circle(surface, (20, 20, 20), (sx, sy), int(self.radius), width=2)
+
+        rotated_sprite = pg.transform.rotate(self.sprite, self.angle)
+        draw_rect = rotated_sprite.get_rect(center=(sx, sy))
+        surface.blit(rotated_sprite, draw_rect)

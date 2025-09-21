@@ -1,6 +1,7 @@
 import os
 import sys
 import pygame as pg
+import math
 
 from GameObject.ball import Ball
 from GameObject.player import Player
@@ -23,6 +24,36 @@ def draw_pitch(surface: pg.Surface):
     center_x = (left + right) // 2
     pg.draw.line(surface, (220, 255, 220), (center_x, top), (center_x, bottom), width=2)
     pg.draw.circle(surface, (220, 255, 220), (center_x, (top + bottom) // 2), 60, width=2)
+    # Center spot
+    pg.draw.circle(surface, (220, 255, 220), (center_x, (top + bottom) // 2), 4)
+
+    # Penalty areas
+    pg.draw.rect(surface, (220, 255, 220), pg.Rect(left, (top + bottom) // 2 - 100, 120, 200), width=2)
+    pg.draw.rect(surface, (220, 255, 220), pg.Rect(right - 120, (top + bottom) // 2 - 100, 120, 200), width=2)
+
+    # goal areas
+    pg.draw.rect(
+        surface,
+        (220, 255, 220),
+        pg.Rect(left, (top + bottom) // 2 - 50, 40, 100),
+        width=2,
+    )
+    pg.draw.rect(
+        surface,
+        (220, 255, 220),
+        pg.Rect(right - 40, (top + bottom) // 2 - 50, 40, 100),
+        width=2,
+    )
+
+    # penalty arcs
+    pg.draw.arc(surface, (220, 255, 220), pg.Rect(left +
+                    120 - 60, (top + bottom) // 2 - 60, 120, 120), -0.5 * math.pi, 0.5 * math.pi, width=2)
+    pg.draw.arc(surface, (220, 255, 220), pg.Rect(right - 120 - 60,
+                    (top + bottom) // 2 - 60, 120, 120), 0.5 * math.pi, 1.5 * math.pi, width=2)
+
+    # penalty spots
+    pg.draw.circle(surface, (220, 255, 220), (left + 90, (top + bottom) // 2), 4)
+    pg.draw.circle(surface, (220, 255, 220), (right - 90, (top + bottom) // 2), 4)
 
 
 def run():

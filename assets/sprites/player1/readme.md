@@ -1,0 +1,1 @@
+cắt sprite here https://ezgif.com/sprite-cutter
