@@ -5,10 +5,12 @@ import math
 
 from GameObject.ball import Ball
 from GameObject.player import Player
+from ui.hud import HUDPanel
+from ui.timer import CountdownTimer
 
+SCREEN_SIZE = (960, 620)
+PITCH_RECT = pg.Rect(100, 100, SCREEN_SIZE[0] - 100, SCREEN_SIZE[1] - 100)
 
-SCREEN_SIZE = (960, 540)
-PITCH_RECT = (60, 60, SCREEN_SIZE[0] - 60, SCREEN_SIZE[1] - 60)
 
 
 def world_to_screen(x: float, y: float, z: float, camera=(0, 0)):
@@ -17,7 +19,8 @@ def world_to_screen(x: float, y: float, z: float, camera=(0, 0)):
 
 
 def draw_pitch(surface: pg.Surface):
-    surface.fill((18, 100, 40))
+    surface.fill((85, 137, 7))
+    """
     left, top, right, bottom = PITCH_RECT
     pg.draw.rect(surface, (220, 255, 220), pg.Rect(left, top, right - left, bottom - top), width=4, border_radius=8)
     # Mid line and circle
@@ -45,6 +48,26 @@ def draw_pitch(surface: pg.Surface):
         width=2,
     )
 
+    # Goals (khung thành thật, nhô ra ngoài sân)
+    goal_width = 40   # độ sâu khung thành
+    goal_height = 80 # chiều cao khung thành
+
+    # Khung thành bên trái
+    pg.draw.rect(
+        surface,
+        (220, 255, 220),
+        pg.Rect(left - goal_width, (top + bottom) // 2 - goal_height // 2, goal_width, goal_height),
+        width=2,
+    )
+
+    # Khung thành bên phải
+    pg.draw.rect(
+        surface,
+        (220, 255, 220),
+        pg.Rect(right, (top + bottom) // 2 - goal_height // 2, goal_width, goal_height),
+        width=2,
+    )
+
     # penalty arcs
     pg.draw.arc(surface, (220, 255, 220), pg.Rect(left +
                     120 - 60, (top + bottom) // 2 - 60, 120, 120), -0.5 * math.pi, 0.5 * math.pi, width=2)
@@ -53,18 +76,55 @@ def draw_pitch(surface: pg.Surface):
 
     # penalty spots
     pg.draw.circle(surface, (220, 255, 220), (left + 90, (top + bottom) // 2), 4)
-    pg.draw.circle(surface, (220, 255, 220), (right - 90, (top + bottom) // 2), 4)
+    pg.draw.circle(surface, (220, 255, 220), (right - 90, (top + bottom) // 2), 4)"""
+
 
 
 def run():
     os.environ["SDL_VIDEO_CENTERED"] = "1"
+    left, top, right, bottom = PITCH_RECT
     pg.init()
     pg.display.set_caption("Ball Massage")
     screen = pg.display.set_mode(SCREEN_SIZE)
     clock = pg.time.Clock()
 
-    player = Player((SCREEN_SIZE[0] * 0.3, SCREEN_SIZE[1] * 0.5))
+    field_image = pg.image.load("assets/sprites/field.png").convert()
+    field_image = pg.transform.scale(field_image, (right - left, bottom - top))
+
+    pg.mixer.init()
+    sound_ballhit = pg.mixer.Sound("assets/audio/ball_hit.mp3")
+    sound_playerrun = pg.mixer.Sound("assets/audio/player_run.mp3")
+
+    goal_width = 40   # độ sâu khung thành
+    goal_height = 80 # chiều cao khung thành
+
+    # Load font and create HUD
+    font_score = pg.font.Font("assets/fonts/Retroville NC.TTF", 32)
+    font_timer = pg.font.Font("assets/fonts/Retroville NC.TTF", 24)
+    hud = HUDPanel(font_score, font_timer, center=(SCREEN_SIZE[0] // 2, 50))
+
+    # Create game objects
+    player1 = Player(
+    (SCREEN_SIZE[0] * 0.3, SCREEN_SIZE[1] * 0.5),
+    sprite_path="./assets/sprites/player1/"
+    )
+    player2 = Player(
+    (SCREEN_SIZE[0] * 0.7, SCREEN_SIZE[1] * 0.5),
+    sprite_path="./assets/sprites/player2/"
+    )
     ball = Ball((SCREEN_SIZE[0] * 0.5, SCREEN_SIZE[1] * 0.5))
+    goal_left = pg.Rect(left - goal_width, (top + bottom) // 2 - goal_height // 2, goal_width, goal_height)
+    goal_right =  pg.Rect(right, (top + bottom) // 2 - goal_height // 2, goal_width, goal_height)
+
+    goal_net = pg.image.load("assets/sprites/goalpost.png").convert_alpha()
+    goal_net_left = pg.transform.scale(goal_net, (goal_width, goal_height))
+    goal_net_right = pg.transform.scale(goal_net, (goal_width, goal_height))
+    goal_net_right = pg.transform.flip(goal_net_right, True, False)
+
+    score_left = 0
+    score_right = 0
+
+    timer = CountdownTimer(60000)
 
     camera = (0, 0)
     running = True
@@ -75,7 +135,8 @@ def run():
                 running = False
             if event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE:
                 running = False
-            # Kick ball with space
+            # Kick ball with space - Giai quyet sau
+            """
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 # aim towards mouse
                 mx, my = pg.mouse.get_pos()
@@ -84,31 +145,62 @@ def run():
                 length = max(1.0, (dir_x * dir_x + dir_y * dir_y) ** 0.5)
                 scale = 420.0 / length
                 impulse = (dir_x * scale, dir_y * scale)
-                ball.kick(impulse)
+                ball.kick(impulse)"""
 
         pressed = pg.key.get_pressed()
-        keys = {
-            "left": pressed[pg.K_LEFT],
-            "right": pressed[pg.K_RIGHT],
-            "up": pressed[pg.K_UP],
-            "down": pressed[pg.K_DOWN],
+        play1_keys = {
             "a": pressed[pg.K_a],
             "d": pressed[pg.K_d],
             "w": pressed[pg.K_w],
             "s": pressed[pg.K_s],
         }
 
-        player.update(dt, keys, PITCH_RECT)
-        ball.update(dt, PITCH_RECT)
+        play2_keys = {
+            "left": pressed[pg.K_LEFT],
+            "right": pressed[pg.K_RIGHT],
+            "up": pressed[pg.K_UP],
+            "down": pressed[pg.K_DOWN],
+        }
+
+        player1.update(dt, play1_keys, PITCH_RECT)
+        player2.update(dt, play2_keys, PITCH_RECT)
+
+        #ball.update(dt, BALL_RECT)
+        ball.update(dt, PITCH_RECT, goal_left, goal_right)
 
         # Player-ball collision when on ground proximity
-        ball.collide_with_player(player, restitution=0.2)
+        ball.collide_with_player(player1, restitution=0.2)
+        ball.collide_with_player(player2, restitution=0.2)
 
+        # Check for goal
+        if ball.rect.right < goal_left.right and goal_left.top < ball.rect.centery < goal_left.bottom:
+            print("Goal for Right Team!")
+            score_right += 1
+            ball.reset()
+
+        # Bóng qua vạch khung thành bên phải
+        if ball.rect.left > goal_right.left and goal_right.top < ball.rect.centery < goal_right.bottom:
+            print("Goal for Left Team!")
+            score_left += 1
+            ball.reset()
         # Render
-        draw_pitch(screen)
+
+
+        draw_pitch(screen) #Se xoa sau
+
+        screen.blit(field_image, (left, top)) 
+
+        # Goal nets
+        screen.blit(goal_net_left, goal_left.topleft)
+        screen.blit(goal_net_right, goal_right.topleft)
+        time_str = timer.format_mmss()
+        hud.draw(screen, score_left, score_right, time_str)
+
+        
         # Draw in depth order by y
         drawables = [
-            (player.pos.y, lambda: player.draw(screen, world_to_screen, camera)),
+            (player1.pos.y, lambda: player1.draw(screen, world_to_screen, camera)),
+            (player2.pos.y, lambda: player2.draw(screen, world_to_screen, camera)),
             (ball.pos.y, lambda: ball.draw(screen, world_to_screen, camera)),
         ]
         for _, draw_fn in sorted(drawables, key=lambda t: t[0]):

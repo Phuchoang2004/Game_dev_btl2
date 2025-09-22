@@ -3,6 +3,7 @@ import pygame as pg
 
 class Ball:
     def __init__(self, start_pos: tuple[float, float]):
+        self.start_pos = Vec2(*start_pos)
         self.pos = Vec2(*start_pos)
         self.vel = Vec2(0.0, 0.0)
         self.acc = Vec2(0.0, 0.0)
@@ -27,10 +28,33 @@ class Ball:
         self.vel.x *= k
         self.vel.y *= k
 
-    def update(self, dt: float, bounds_rect: tuple[float, float, float, float]):
+    def update(self, dt: float, pitch_rect: pg.Rect, goal_left: pg.Rect, goal_right: pg.Rect):
         self.acc = Vec2(0.0, 0.0)
         new_pos, new_vel = integrate_velocity(self.pos, self.vel, self.acc, dt, 0.0)
-        new_pos, new_vel = clamp_to_rect(new_pos, new_vel, bounds_rect, self.radius, self.restitution_wall)
+        #new_pos, new_vel = clamp_to_rect(new_pos, new_vel, bounds_rect, self.radius, self.restitution_wall)
+        if new_pos.y - self.radius < pitch_rect.top:
+            new_pos.y = pitch_rect.top + self.radius
+            new_vel.y *= -self.restitution_wall
+
+        # Biên dưới
+        if new_pos.y + self.radius > pitch_rect.bottom:
+            new_pos.y = pitch_rect.bottom - self.radius
+            new_vel.y *= -self.restitution_wall
+
+        # Biên trái
+        if new_pos.x - self.radius < pitch_rect.left:
+            # Nếu bóng nằm trong khung thành trái thì cho đi qua
+            if not goal_left.collidepoint(new_pos.x - self.radius, new_pos.y):
+                new_pos.x = pitch_rect.left + self.radius
+                new_vel.x *= -self.restitution_wall
+
+        # Biên phải
+        if new_pos.x + self.radius > pitch_rect.right:
+            # Nếu bóng nằm trong khung thành phải thì cho đi qua
+            if not goal_right.collidepoint(new_pos.x + self.radius, new_pos.y):
+                new_pos.x = pitch_rect.right - self.radius
+                new_vel.x *= -self.restitution_wall
+
         self.pos = new_pos
         self.vel = new_vel
 
@@ -58,3 +82,10 @@ class Ball:
         rotated_sprite = pg.transform.rotate(self.sprite, self.angle)
         draw_rect = rotated_sprite.get_rect(center=(sx, sy))
         surface.blit(rotated_sprite, draw_rect)
+
+    def reset(self):
+        self.pos = self.start_pos.copy()   # quay lại vị trí spawn ban đầu
+        self.vel = Vec2(0.0, 0.0)
+        self.acc = Vec2(0.0, 0.0)
+        self.angle = 0.0
+        self.rect.center = (self.pos.x, self.pos.y)
