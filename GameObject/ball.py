@@ -20,14 +20,10 @@ class Ball:
 
         self.sprite = pg.image.load("./assets/sprites/football.png").convert_alpha()
         diameter = int(self.radius * 2)
-        self.sprite = pg.transform.smoothscale(self.sprite, (diameter, diameter))
+        self.sprite = pg.transform.scale(self.sprite, (diameter, diameter))
         self.rect = self.sprite.get_rect(center=(self.pos.x, self.pos.y))
 
         self.angle = 0.0
-
-        # glow
-        self.glow_bool = False
-        self.glow_surface = pg.Surface((self.radius * 4, self.radius * 4), pg.SRCALPHA)
 
     def kick(self, impulse_xy: tuple[float, float]):
         self.vel.x += float(impulse_xy[0])
@@ -108,17 +104,12 @@ class Ball:
         import pygame as pg
 
         sx, sy = world_to_screen_fn(self.pos.x, self.pos.y, 0.0, camera)
-        pg.draw.circle(surface, (240, 240, 240), (sx, sy), int(self.radius))
-        pg.draw.circle(surface, (20, 20, 20), (sx, sy), int(self.radius), width=2)
+        # pg.draw.circle(surface, (240, 240, 240), (sx, sy), int(self.radius))
+        # pg.draw.circle(surface, (20, 20, 20), (sx, sy), int(self.radius), width=2)
 
         rotated_sprite = pg.transform.rotate(self.sprite, self.angle)
         draw_rect = rotated_sprite.get_rect(center=(sx, sy))
         surface.blit(rotated_sprite, draw_rect)
-
-        if self.glow_bool:
-            # Glow is centered under ball
-            glow_rect = self.glow_surface.get_rect(center=(sx, sy))
-            surface.blit(self.glow_surface, glow_rect)
 
     def reset(self):
         self.pos = self.start_pos.copy()  # quay lại vị trí spawn ban đầu
