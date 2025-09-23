@@ -2,6 +2,7 @@ import os
 import sys
 import pygame as pg
 import math
+from Physics.physics import resolve_circle_vs_circle, clamp_to_rect
 
 from GameObject.ball import Ball
 from GameObject.player import Player
@@ -9,7 +10,8 @@ from ui.hud import HUDPanel
 from ui.timer import CountdownTimer
 
 SCREEN_SIZE = (960, 620)
-PITCH_RECT = pg.Rect(100, 100, SCREEN_SIZE[0] - 100, SCREEN_SIZE[1] - 100)
+# Center the pitch with equal margins on all sides (100px)
+PITCH_RECT = pg.Rect(100, 100, SCREEN_SIZE[0] - 200, SCREEN_SIZE[1] - 200)
 
 
 
@@ -82,7 +84,12 @@ def draw_pitch(surface: pg.Surface):
 
 def run():
     os.environ["SDL_VIDEO_CENTERED"] = "1"
-    left, top, right, bottom = PITCH_RECT
+    left, top, right, bottom = (
+        PITCH_RECT.left,
+        PITCH_RECT.top,
+        PITCH_RECT.right,
+        PITCH_RECT.bottom,
+    )
     pg.init()
     pg.display.set_caption("Ball Massage")
     screen = pg.display.set_mode(SCREEN_SIZE)
@@ -135,17 +142,12 @@ def run():
                 running = False
             if event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE:
                 running = False
-            # Kick ball with space - Giai quyet sau
-            """
-            if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
-                # aim towards mouse
-                mx, my = pg.mouse.get_pos()
-                dir_x = mx - player.pos.x
-                dir_y = my - player.pos.y
-                length = max(1.0, (dir_x * dir_x + dir_y * dir_y) ** 0.5)
-                scale = 420.0 / length
-                impulse = (dir_x * scale, dir_y * scale)
-                ball.kick(impulse)"""
+            # Kick inputs
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_SPACE:
+                    player1.attempt_kick(ball, sound_ballhit)
+                if event.key in (pg.K_RCTRL, pg.K_RSHIFT):
+                    player2.attempt_kick(ball, sound_ballhit)
 
         pressed = pg.key.get_pressed()
         play1_keys = {
@@ -171,6 +173,15 @@ def run():
         # Player-ball collision when on ground proximity
         ball.collide_with_player(player1, restitution=0.2)
         ball.collide_with_player(player2, restitution=0.2)
+
+        # Player-player hun nhau (us)
+        p1p, p1v, p2p, p2v = resolve_circle_vs_circle(
+            player1.pos, player1.radius, player1.vel,
+            player2.pos, player2.radius, player2.vel,
+            restitution=0.0,
+        )
+        player1.pos, player1.vel = p1p, p1v
+        player2.pos, player2.vel = p2p, p2v
 
         # Check for goal
         if ball.rect.right < goal_left.right and goal_left.top < ball.rect.centery < goal_left.bottom:

@@ -40,7 +40,17 @@ class Player:
         self.anim_timer = 0.0  # time accumulator
         self.anim_speed = 0.12  # seconds per frame (tweak for faster/slower walk)
 
+        # Kick settings
+        self.kick_power = 520.0
+        self.kick_extra_range = 6.0
+        self.kick_cooldown = 0.35
+        self.kick_timer = 0.0
+
     def update(self, dt: float, keys, bounds_rect: tuple[float, float, float, float]):
+        # Cooldoawn
+        if self.kick_timer > 0.0:
+            self.kick_timer = max(0.0, self.kick_timer - dt)
+
         move_x = 0.0
         move_y = 0.0
         if keys is not None:
@@ -61,7 +71,14 @@ class Player:
         if new_vel.length() > self.max_speed:
             new_vel = new_vel.clamp_length(self.max_speed)
 
-        new_pos, new_vel = clamp_to_rect(new_pos, new_vel, bounds_rect, self.radius, restitution=0.0)
+        # Pass explicit edges to clamp_to_rect
+        new_pos, new_vel = clamp_to_rect(
+            new_pos,
+            new_vel,
+            (bounds_rect.left, bounds_rect.top, bounds_rect.right, bounds_rect.bottom),
+            self.radius,
+            restitution=0.0,
+        )
 
         self.pos = new_pos
         self.vel = new_vel
@@ -111,3 +128,30 @@ class Player:
 
         # draw sprite
         surface.blit(frame, rect)
+
+    def attempt_kick(self, ball, sound=None) -> bool:
+        if self.kick_timer > 0.0:
+            return False
+        # Check tầm
+        delta = Vec2(ball.pos.x - self.pos.x, ball.pos.y - self.pos.y)
+        dist_sq = delta.length_sq()
+        max_reach = (self.radius + ball.radius + self.kick_extra_range)
+        if dist_sq > max_reach * max_reach:
+            return False
+        # Hướng
+        if dist_sq <= 1e-6:
+            direction = self.facing
+        else:
+            direction = delta.normalized()
+        impulse = direction * self.kick_power
+        # Vận tốc hiện tại + sút
+        impulse.x += self.vel.x * 0.25
+        impulse.y += self.vel.y * 0.25
+        ball.kick((impulse.x, impulse.y))
+        if sound is not None:
+            try:
+                sound.play()
+            except Exception:
+                pass
+        self.kick_timer = self.kick_cooldown
+        return True

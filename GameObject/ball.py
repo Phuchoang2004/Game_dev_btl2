@@ -31,29 +31,35 @@ class Ball:
     def update(self, dt: float, pitch_rect: pg.Rect, goal_left: pg.Rect, goal_right: pg.Rect):
         self.acc = Vec2(0.0, 0.0)
         new_pos, new_vel = integrate_velocity(self.pos, self.vel, self.acc, dt, 0.0)
-        #new_pos, new_vel = clamp_to_rect(new_pos, new_vel, bounds_rect, self.radius, self.restitution_wall)
-        if new_pos.y - self.radius < pitch_rect.top:
-            new_pos.y = pitch_rect.top + self.radius
-            new_vel.y *= -self.restitution_wall
+        #double check
+        r = self.radius
+        left, top, right, bottom = pitch_rect.left, pitch_rect.top, pitch_rect.right, pitch_rect.bottom
 
-        # Biên dưới
-        if new_pos.y + self.radius > pitch_rect.bottom:
-            new_pos.y = pitch_rect.bottom - self.radius
-            new_vel.y *= -self.restitution_wall
+        # Top
+        if new_pos.y - r < top:
+            new_pos.y = top + r
+            if new_vel.y < 0:
+                new_vel.y = -new_vel.y * self.restitution_wall
 
-        # Biên trái
-        if new_pos.x - self.radius < pitch_rect.left:
-            # Nếu bóng nằm trong khung thành trái thì cho đi qua
-            if not goal_left.collidepoint(new_pos.x - self.radius, new_pos.y):
-                new_pos.x = pitch_rect.left + self.radius
-                new_vel.x *= -self.restitution_wall
+        # Bottom
+        if new_pos.y + r > bottom:
+            new_pos.y = bottom - r
+            if new_vel.y > 0:
+                new_vel.y = -new_vel.y * self.restitution_wall
 
-        # Biên phải
-        if new_pos.x + self.radius > pitch_rect.right:
-            # Nếu bóng nằm trong khung thành phải thì cho đi qua
-            if not goal_right.collidepoint(new_pos.x + self.radius, new_pos.y):
-                new_pos.x = pitch_rect.right - self.radius
-                new_vel.x *= -self.restitution_wall
+        # Left (skip clamp when within vertical goal mouth)
+        if new_pos.x - r < left:
+            if not (goal_left.top < new_pos.y < goal_left.bottom):
+                new_pos.x = left + r
+                if new_vel.x < 0:
+                    new_vel.x = -new_vel.x * self.restitution_wall
+
+        # Right (skip clamp when within vertical goal mouth)
+        if new_pos.x + r > right:
+            if not (goal_right.top < new_pos.y < goal_right.bottom):
+                new_pos.x = right - r
+                if new_vel.x > 0:
+                    new_vel.x = -new_vel.x * self.restitution_wall
 
         self.pos = new_pos
         self.vel = new_vel
