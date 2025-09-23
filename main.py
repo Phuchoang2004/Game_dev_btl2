@@ -14,7 +14,6 @@ SCREEN_SIZE = (960, 620)
 PITCH_RECT = pg.Rect(100, 100, SCREEN_SIZE[0] - 200, SCREEN_SIZE[1] - 200)
 
 
-
 def world_to_screen(x: float, y: float, z: float, camera=(0, 0)):
     cam_x, cam_y = camera
     return int(x - cam_x), int(y - cam_y)
@@ -81,6 +80,14 @@ def draw_pitch(surface: pg.Surface):
     pg.draw.circle(surface, (220, 255, 220), (right - 90, (top + bottom) // 2), 4)"""
 
 
+def draw_crowds(surface: pg.Surface, crowd_img: pg.Surface):
+    surface.blit(crowd_img, (0, 0)) #left
+    surface.blit(crowd_img, (SCREEN_SIZE[0] // 2 - crowd_img.get_width() // 2, 0)) # middle
+    surface.blit(crowd_img, (SCREEN_SIZE[0] - crowd_img.get_width(), 0)) # right
+    surface.blit(crowd_img, (0, SCREEN_SIZE[1] - crowd_img.get_height()))
+    surface.blit(crowd_img, (SCREEN_SIZE[0] // 2 - crowd_img.get_width() // 2, SCREEN_SIZE[1] - crowd_img.get_height()))
+    surface.blit(crowd_img, (SCREEN_SIZE[0] - crowd_img.get_width(), SCREEN_SIZE[1] - crowd_img.get_height()))
+
 
 def run():
     os.environ["SDL_VIDEO_CENTERED"] = "1"
@@ -98,12 +105,21 @@ def run():
     field_image = pg.image.load("assets/sprites/field.png").convert()
     field_image = pg.transform.scale(field_image, (right - left, bottom - top))
 
+    crowd_image1 = pg.image.load("assets/sprites/crowd1.png").convert_alpha()
+    crowd_image1 = pg.transform.scale(crowd_image1, (300, 100))
+    crowd_image2 = pg.image.load("assets/sprites/crowd2.png").convert_alpha()
+    crowd_image2 = pg.transform.scale(crowd_image2, (300, 100))
+    crowd_images = [crowd_image1, crowd_image2]
+    crowd_index = 0
+    crowd_timer = 0.0
+    crowd_interval = 0.3
+
     pg.mixer.init()
     sound_ballhit = pg.mixer.Sound("assets/audio/ball_hit.mp3")
     sound_playerrun = pg.mixer.Sound("assets/audio/player_run.mp3")
 
-    goal_width = 40   # độ sâu khung thành
-    goal_height = 80 # chiều cao khung thành
+    goal_width = 40  # độ sâu khung thành
+    goal_height = 80  # chiều cao khung thành
 
     # Load font and create HUD
     font_score = pg.font.Font("assets/fonts/Retroville NC.TTF", 32)
@@ -112,16 +128,23 @@ def run():
 
     # Create game objects
     player1 = Player(
-    (SCREEN_SIZE[0] * 0.3, SCREEN_SIZE[1] * 0.5),
-    sprite_path="./assets/sprites/player1/"
+        (SCREEN_SIZE[0] * 0.3, SCREEN_SIZE[1] * 0.5),
+        sprite_path="./assets/sprites/player1/",
     )
     player2 = Player(
-    (SCREEN_SIZE[0] * 0.7, SCREEN_SIZE[1] * 0.5),
-    sprite_path="./assets/sprites/player2/"
+        (SCREEN_SIZE[0] * 0.7, SCREEN_SIZE[1] * 0.5),
+        sprite_path="./assets/sprites/player2/",
     )
     ball = Ball((SCREEN_SIZE[0] * 0.5, SCREEN_SIZE[1] * 0.5))
-    goal_left = pg.Rect(left - goal_width, (top + bottom) // 2 - goal_height // 2, goal_width, goal_height)
-    goal_right =  pg.Rect(right, (top + bottom) // 2 - goal_height // 2, goal_width, goal_height)
+    goal_left = pg.Rect(
+        left - goal_width,
+        (top + bottom) // 2 - goal_height // 2,
+        goal_width,
+        goal_height,
+    )
+    goal_right = pg.Rect(
+        right, (top + bottom) // 2 - goal_height // 2, goal_width, goal_height
+    )
 
     goal_net = pg.image.load("assets/sprites/goalpost.png").convert_alpha()
     goal_net_left = pg.transform.scale(goal_net, (goal_width, goal_height))
@@ -135,7 +158,14 @@ def run():
 
     camera = (0, 0)
     running = True
+
+    # play field ambient sound
+    pg.mixer.music.load("assets/audio/stadium_sound.mp3")
+    pg.mixer.music.set_volume(0.2)
+    pg.mixer.music.play(loops=-1)
+
     while running:
+
         dt = clock.tick(60) / 1000.0
         for event in pg.event.get():
             if event.type == pg.QUIT:
@@ -167,7 +197,7 @@ def run():
         player1.update(dt, play1_keys, PITCH_RECT)
         player2.update(dt, play2_keys, PITCH_RECT)
 
-        #ball.update(dt, BALL_RECT)
+        # ball.update(dt, BALL_RECT)
         ball.update(dt, PITCH_RECT, goal_left, goal_right)
 
         # Player-ball collision when on ground proximity
@@ -176,38 +206,52 @@ def run():
 
         # Player-player hun nhau (us)
         p1p, p1v, p2p, p2v = resolve_circle_vs_circle(
-            player1.pos, player1.radius, player1.vel,
-            player2.pos, player2.radius, player2.vel,
+            player1.pos,
+            player1.radius,
+            player1.vel,
+            player2.pos,
+            player2.radius,
+            player2.vel,
             restitution=0.0,
         )
         player1.pos, player1.vel = p1p, p1v
         player2.pos, player2.vel = p2p, p2v
 
         # Check for goal
-        if ball.rect.right < goal_left.right and goal_left.top < ball.rect.centery < goal_left.bottom:
+        goal_sound = pg.mixer.Sound("assets/audio/goal.mp3")
+        goal_sound.set_volume(0.5)
+        if (
+            ball.rect.right < goal_left.right
+            and goal_left.top < ball.rect.centery < goal_left.bottom
+        ):
+            goal_sound.play()
             print("Goal for Right Team!")
             score_right += 1
             ball.reset()
 
         # Bóng qua vạch khung thành bên phải
-        if ball.rect.left > goal_right.left and goal_right.top < ball.rect.centery < goal_right.bottom:
+        if (
+            ball.rect.left > goal_right.left
+            and goal_right.top < ball.rect.centery < goal_right.bottom
+        ):
+            goal_sound.play()
             print("Goal for Left Team!")
             score_left += 1
             ball.reset()
         # Render
 
+        draw_pitch(screen)  # Se xoa sau
 
-        draw_pitch(screen) #Se xoa sau
+        screen.blit(field_image, (left, top))
 
-        screen.blit(field_image, (left, top)) 
+        # draw crowds
+        crowd_timer += dt
+        if crowd_timer >= crowd_interval:
+            crowd_timer = 0.0
+            crowd_index = (crowd_index + 1) % 2
+        # draw crowds
+        draw_crowds(screen, crowd_images[crowd_index])
 
-        # Goal nets
-        screen.blit(goal_net_left, goal_left.topleft)
-        screen.blit(goal_net_right, goal_right.topleft)
-        time_str = timer.format_mmss()
-        hud.draw(screen, score_left, score_right, time_str)
-
-        
         # Draw in depth order by y
         drawables = [
             (player1.pos.y, lambda: player1.draw(screen, world_to_screen, camera)),
@@ -216,6 +260,12 @@ def run():
         ]
         for _, draw_fn in sorted(drawables, key=lambda t: t[0]):
             draw_fn()
+
+            # Goal nets
+        screen.blit(goal_net_left, goal_left.topleft)
+        screen.blit(goal_net_right, goal_right.topleft)
+        time_str = timer.format_mmss()
+        hud.draw(screen, score_left, score_right, time_str)
 
         pg.display.flip()
 

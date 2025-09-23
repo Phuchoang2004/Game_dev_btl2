@@ -46,6 +46,9 @@ class Player:
         self.kick_cooldown = 0.35
         self.kick_timer = 0.0
 
+        self.run_sound = pg.mixer.Sound("./assets/audio/player_run.mp3")
+        self.is_running_sound_playing = False
+
     def update(self, dt: float, keys, bounds_rect: tuple[float, float, float, float]):
         # Cooldoawn
         if self.kick_timer > 0.0:
@@ -88,6 +91,11 @@ class Player:
             self.facing = vnorm
 
         if self.vel.length_sq() > 1:  # moving
+            # play walk sound
+            if not self.is_running_sound_playing:
+                self.run_sound.play(loops=-1)
+                self.is_running_sound_playing = True
+
             # pick animation set based on facing direction
             if abs(self.facing.x) > abs(self.facing.y):
                 if self.facing.x > 0:
@@ -110,6 +118,10 @@ class Player:
         else:
             # idle: reset to first frame
             self.anim_index = 0
+
+            if self.is_running_sound_playing:
+                self.run_sound.stop()
+                self.is_running_sound_playing = False
 
     def draw(self, surface, world_to_screen_fn, camera):
         sx, sy = world_to_screen_fn(self.pos.x, self.pos.y, 0.0, camera)
@@ -137,6 +149,7 @@ class Player:
         dist_sq = delta.length_sq()
         max_reach = (self.radius + ball.radius + self.kick_extra_range)
         if dist_sq > max_reach * max_reach:
+            pg.mixer.Sound("assets/audio/ball_miss.mp3").play()
             return False
         # Hướng
         if dist_sq <= 1e-6:
