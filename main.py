@@ -88,6 +88,11 @@ def draw_crowds(surface: pg.Surface, crowd_img: pg.Surface):
     surface.blit(crowd_img, (SCREEN_SIZE[0] // 2 - crowd_img.get_width() // 2, SCREEN_SIZE[1] - crowd_img.get_height()))
     surface.blit(crowd_img, (SCREEN_SIZE[0] - crowd_img.get_width(), SCREEN_SIZE[1] - crowd_img.get_height()))
 
+def draw_indicator(surface, player, world_to_screen, camera):
+    screen_x, screen_y = world_to_screen(player.pos.x, player.pos.y, 0, camera)
+    # Vẽ vòng tròn highlight dưới chân
+    pg.draw.circle(surface, (255, 255, 0), (screen_x, screen_y + player.radius), player.radius + 5, 2)
+
 
 def run():
     os.environ["SDL_VIDEO_CENTERED"] = "1"
@@ -114,6 +119,13 @@ def run():
     crowd_timer = 0.0
     crowd_interval = 0.3
 
+    indicator_red = pg.image.load("assets/sprites/redteam.png").convert_alpha()
+    indicator_blue = pg.image.load("assets/sprites/blueteam.png").convert_alpha()  
+    indicator_blue = pg.transform.scale(indicator_blue, (40, 40))
+    indicator_red = pg.transform.scale(indicator_red, (40, 40))
+    indicator_blue = pg.transform.rotate(indicator_blue, 180)
+    indicator_red = pg.transform.rotate(indicator_red, 180)
+
     pg.mixer.init()
     sound_ballhit = pg.mixer.Sound("assets/audio/ball_hit.mp3")
     sound_playerrun = pg.mixer.Sound("assets/audio/player_run.mp3")
@@ -127,14 +139,31 @@ def run():
     hud = HUDPanel(font_score, font_timer, center=(SCREEN_SIZE[0] // 2, 50))
 
     # Create game objects
-    player1 = Player(
+    """player1 = Player(
         (SCREEN_SIZE[0] * 0.3, SCREEN_SIZE[1] * 0.5),
         sprite_path="./assets/sprites/player1/",
     )
     player2 = Player(
         (SCREEN_SIZE[0] * 0.7, SCREEN_SIZE[1] * 0.5),
         sprite_path="./assets/sprites/player2/",
-    )
+    )"""
+    team1_players = [
+        Player((SCREEN_SIZE[0] * 0.3, SCREEN_SIZE[1] * 0.4), sprite_path="./assets/sprites/player1/"),
+        Player((SCREEN_SIZE[0] * 0.3, SCREEN_SIZE[1] * 0.5), sprite_path="./assets/sprites/player1/"),
+        Player((SCREEN_SIZE[0] * 0.3, SCREEN_SIZE[1] * 0.6), sprite_path="./assets/sprites/player1/"),
+    ]
+
+    team2_players = [
+        Player((SCREEN_SIZE[0] * 0.7, SCREEN_SIZE[1] * 0.4), sprite_path="./assets/sprites/player2/"),
+        Player((SCREEN_SIZE[0] * 0.7, SCREEN_SIZE[1] * 0.5), sprite_path="./assets/sprites/player2/"),
+        Player((SCREEN_SIZE[0] * 0.7, SCREEN_SIZE[1] * 0.6), sprite_path="./assets/sprites/player2/"),
+    ]
+    all_players = team1_players + team2_players
+
+    active1 = 0  # cầu thủ active của team1
+    active2 = 0  # cầu thủ active của team2
+
+
     ball = Ball((SCREEN_SIZE[0] * 0.5, SCREEN_SIZE[1] * 0.5))
     goal_left = pg.Rect(
         left - goal_width,
@@ -175,9 +204,13 @@ def run():
             # Kick inputs
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_SPACE:
-                    player1.attempt_kick(ball, sound_ballhit)
+                    team1_players[active1].attempt_kick(ball, sound_ballhit)
                 if event.key in (pg.K_RCTRL, pg.K_RSHIFT):
-                    player2.attempt_kick(ball, sound_ballhit)
+                    team2_players[active2].attempt_kick(ball, sound_ballhit)
+                if event.key == pg.K_q:  # team1 đổi người
+                    active1 = (active1 + 1) % len(team1_players)
+                if event.key == pg.K_p:  # team2 đổi người
+                    active2 = (active2 + 1) % len(team2_players)
 
         pressed = pg.key.get_pressed()
         play1_keys = {
@@ -194,28 +227,39 @@ def run():
             "down": pressed[pg.K_DOWN],
         }
 
-        player1.update(dt, play1_keys, PITCH_RECT)
-        player2.update(dt, play2_keys, PITCH_RECT)
+        team1_players[active1].update(dt, play1_keys, PITCH_RECT)
+        team2_players[active2].update(dt, play2_keys, PITCH_RECT)
+        for i, p in enumerate(team1_players):
+            if i != active1:
+                p.update(dt, {}, PITCH_RECT)  
+        for i, p in enumerate(team2_players):
+            if i != active2:
+                p.update(dt, {}, PITCH_RECT)
 
         # ball.update(dt, BALL_RECT)
         ball.update(dt, PITCH_RECT, goal_left, goal_right)
-
+        
         # Player-ball collision when on ground proximity
-        ball.collide_with_player(player1, restitution=0.2)
-        ball.collide_with_player(player2, restitution=0.2)
+        for p in all_players:
+            ball.collide_with_player(p, restitution=0.2)
 
         # Player-player hun nhau (us)
-        p1p, p1v, p2p, p2v = resolve_circle_vs_circle(
-            player1.pos,
-            player1.radius,
-            player1.vel,
-            player2.pos,
-            player2.radius,
-            player2.vel,
-            restitution=0.0,
-        )
-        player1.pos, player1.vel = p1p, p1v
-        player2.pos, player2.vel = p2p, p2v
+        
+
+# Check va chạm giữa mọi cặp cầu thủ
+        for i in range(len(all_players)):
+            for j in range(i + 1, len(all_players)):
+                p1 = all_players[i]
+                p2 = all_players[j]
+
+                p1p, p1v, p2p, p2v = resolve_circle_vs_circle(
+                    p1.pos, p1.radius, p1.vel,
+                    p2.pos, p2.radius, p2.vel,
+                    restitution=0.0,
+                )
+
+                p1.pos, p1.vel = p1p, p1v
+                p2.pos, p2.vel = p2p, p2v
 
         # Check for goal
         goal_sound = pg.mixer.Sound("assets/audio/goal.mp3")
@@ -254,14 +298,21 @@ def run():
 
         # Draw in depth order by y
         drawables = [
-            (player1.pos.y, lambda: player1.draw(screen, world_to_screen, camera)),
-            (player2.pos.y, lambda: player2.draw(screen, world_to_screen, camera)),
             (ball.pos.y, lambda: ball.draw(screen, world_to_screen, camera)),
         ]
+        for p in team1_players + team2_players:
+            drawables.append((p.pos.y, lambda p=p: p.draw(screen, world_to_screen, camera)))
         for _, draw_fn in sorted(drawables, key=lambda t: t[0]):
             draw_fn()
 
-            # Goal nets
+       
+        p1 = team1_players[active1]
+        ind_rect = indicator_blue.get_rect(center=(p1.pos.x, p1.pos.y - p1.radius - 20))
+        screen.blit(indicator_blue, ind_rect)
+        p2 = team2_players[active2]
+        ind_rect = indicator_red.get_rect(center=(p2.pos.x, p2.pos.y - p2.radius - 20))
+        screen.blit(indicator_red, ind_rect)
+
         screen.blit(goal_net_left, goal_left.topleft)
         screen.blit(goal_net_right, goal_right.topleft)
         time_str = timer.format_mmss()
