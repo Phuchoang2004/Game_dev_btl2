@@ -8,6 +8,7 @@ from GameObject.ball import Ball
 from GameObject.player import Player
 from ui.hud import HUDPanel
 from ui.timer import CountdownTimer
+from controller.AI import AttackingAI, DefensiveAI
 
 SCREEN_SIZE = (960, 620)
 # Center the pitch with equal margins on all sides (100px)
@@ -160,8 +161,49 @@ def run():
     ]
     all_players = team1_players + team2_players
 
+    # Role-based AI instances (shared within team)
+    attack_target_team1 = (right - 20, (top + bottom) // 2)
+    defend_target_team1 = (left + 20, (top + bottom) // 2)
+    attack_target_team2 = (left + 20, (top + bottom) // 2)
+    defend_target_team2 = (right - 20, (top + bottom) // 2)
+
+    ai_attack_team1 = AttackingAI(attack_pos=attack_target_team1)
+    ai_defend_team1 = DefensiveAI(defend_pos=defend_target_team1)
+    ai_attack_team2 = AttackingAI(attack_pos=attack_target_team2)
+    ai_defend_team2 = DefensiveAI(defend_pos=defend_target_team2)
+
     active1 = 0  # cầu thủ active của team1
     active2 = 0  # cầu thủ active của team2
+
+    # Persisted roles per player index: "attack" | "defend" | None (for active)
+    roles1 = [None for _ in team1_players]
+    roles2 = [None for _ in team2_players]
+
+    # Initialize: non-active take one attack and one defend
+    others1 = [i for i in range(len(team1_players)) if i != active1]
+    if len(others1) >= 2:
+        roles1[others1[0]] = "attack"
+        roles1[others1[1]] = "defend"
+    others2 = [i for i in range(len(team2_players)) if i != active2]
+    if len(others2) >= 2:
+        roles2[others2[0]] = "attack"
+        roles2[others2[1]] = "defend"
+
+    def on_switch(team_roles, prev_active_idx, new_active_idx):
+        # Role Switch
+        new_role = team_roles[new_active_idx]
+        team_roles[new_active_idx] = None
+        team_roles[prev_active_idx] = new_role
+        all_idx = list(range(len(team_roles)))
+        non_actives = [i for i in all_idx if i != new_active_idx]
+        desired = {"attack", "defend"}
+        present = set(r for i, r in enumerate(team_roles) if i in non_actives and r is not None)
+        missing = list(desired - present)
+        if missing:
+            for i in non_actives:
+                if team_roles[i] is None or (len(present) == 1 and team_roles[i] in present and len(missing) == 1):
+                    team_roles[i] = missing[0]
+                    break
 
 
     ball = Ball((SCREEN_SIZE[0] * 0.5, SCREEN_SIZE[1] * 0.5))
@@ -188,7 +230,6 @@ def run():
     camera = (0, 0)
     running = True
 
-    # play field ambient sound
     pg.mixer.music.load("assets/audio/stadium_sound.mp3")
     pg.mixer.music.set_volume(0.2)
     pg.mixer.music.play(loops=-1)
@@ -208,9 +249,13 @@ def run():
                 if event.key in (pg.K_RCTRL, pg.K_RSHIFT):
                     team2_players[active2].attempt_kick(ball, sound_ballhit)
                 if event.key == pg.K_q:  # team1 đổi người
+                    prev = active1
                     active1 = (active1 + 1) % len(team1_players)
+                    on_switch(roles1, prev, active1)
                 if event.key == pg.K_p:  # team2 đổi người
+                    prev = active2
                     active2 = (active2 + 1) % len(team2_players)
+                    on_switch(roles2, prev, active2)
 
         pressed = pg.key.get_pressed()
         play1_keys = {
@@ -231,10 +276,20 @@ def run():
         team2_players[active2].update(dt, play2_keys, PITCH_RECT)
         for i, p in enumerate(team1_players):
             if i != active1:
-                p.update(dt, {}, PITCH_RECT)  
+                role = roles1[i] or "attack"
+                ai = ai_attack_team1 if role == "attack" else ai_defend_team1
+                ai_keys = ai.get_keys(p, ball, teammates=team1_players)
+                p.update(dt, ai_keys, PITCH_RECT)
+                if ai.should_kick(p, ball):
+                    p.attempt_kick(ball, sound_ballhit)
         for i, p in enumerate(team2_players):
             if i != active2:
-                p.update(dt, {}, PITCH_RECT)
+                role = roles2[i] or "attack"
+                ai = ai_attack_team2 if role == "attack" else ai_defend_team2
+                ai_keys = ai.get_keys(p, ball, teammates=team2_players)
+                p.update(dt, ai_keys, PITCH_RECT)
+                if ai.should_kick(p, ball):
+                    p.attempt_kick(ball, sound_ballhit)
 
         # ball.update(dt, BALL_RECT)
         ball.update(dt, PITCH_RECT, goal_left, goal_right)
