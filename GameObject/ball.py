@@ -10,13 +10,13 @@ import pygame as pg
 class Ball:
     def __init__(self, start_pos: tuple[float, float]):
         self.start_pos = Vec2(*start_pos)
-        self.pos = Vec2(*start_pos)
-        self.vel = Vec2(0.0, 0.0)
-        self.acc = Vec2(0.0, 0.0)
+        self.pos = Vec2(*start_pos)   # vị trí
+        self.vel = Vec2(0.0, 0.0)     # vận tốc
+        self.acc = Vec2(0.0, 0.0)     # gia tốc (hiếm khi dùng cho bóng)
 
         self.radius = 10.0
-        self.restitution_wall = 0.5
-        self.linear_damping = 1.2
+        self.restitution_wall = 0.5   # hệ số nảy khi chạm tường
+        self.linear_damping = 1.2     # giảm chấn tuyến tính (ma sát không khí đơn giản)
 
         self.sprite = pg.image.load("./assets/sprites/football.png").convert_alpha()
         diameter = int(self.radius * 2)
@@ -26,10 +26,12 @@ class Ball:
         self.angle = 0.0
 
     def kick(self, impulse_xy: tuple[float, float]):
+        # Nhận xung sút: tăng vận tốc theo phương và độ lớn xung
         self.vel.x += float(impulse_xy[0])
         self.vel.y += float(impulse_xy[1])
 
     def apply_drag(self, dt: float):
+        # Ma sát không khí tuyến tính: v *= (1 - c*dt)
         k = max(0.0, 1.0 - self.linear_damping * dt)
         self.vel.x *= k
         self.vel.y *= k
@@ -38,6 +40,7 @@ class Ball:
         self, dt: float, pitch_rect: pg.Rect, goal_left: pg.Rect, goal_right: pg.Rect
     ):
         self.acc = Vec2(0.0, 0.0)
+        # Tích phân chuyển động 2D (Euler): v+=a*dt; x+=v*dt
         new_pos, new_vel = integrate_velocity(self.pos, self.vel, self.acc, dt, 0.0)
         # double check
         r = self.radius
@@ -52,7 +55,7 @@ class Ball:
         if new_pos.y - r < top:
             new_pos.y = top + r
             if new_vel.y < 0:
-                new_vel.y = -new_vel.y * self.restitution_wall
+                new_vel.y = -new_vel.y * self.restitution_wall  # phản xạ + hệ số nảy
 
         # Bottom
         if new_pos.y + r > bottom:
@@ -77,15 +80,16 @@ class Ball:
         self.pos = new_pos
         self.vel = new_vel
 
-        self.apply_drag(dt)
+        self.apply_drag(dt)  # giảm tốc dần theo thời gian
 
-        speed = self.vel.length()
-        spin_rate = speed * 10.0  # tweak multiplier for faster/slower spin
+        speed = self.vel.length()             # tốc độ |v|
+        spin_rate = speed * 10.0             # quay nhanh hơn khi nhanh hơn (hiệu ứng)
         self.angle = (self.angle + spin_rate * dt) % 360
 
         self.rect.center = (self.pos.x, self.pos.y)
 
     def collide_with_player(self, player, restitution: float = 0.3):
+        # Va chạm hình tròn người chơi - bóng, trả về vị trí/vận tốc sau va chạm
         p1, v1, p2, v2 = resolve_circle_vs_circle(
             player.pos,
             player.radius,

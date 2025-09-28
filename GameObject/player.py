@@ -4,6 +4,7 @@ import pygame as pg
 
 scale = 2.0
 def load_and_scale(path, count):
+    # Tải và scale danh sách frame sprite theo hệ số scale
     frames = []
     for i in range(count):
         img = pg.image.load(path.format(i)).convert_alpha()
@@ -15,17 +16,17 @@ def load_and_scale(path, count):
 
 class Player:
     def __init__(self, start_pos: tuple[float, float], color: tuple[int, int, int] = (40, 120, 255), sprite_path: str = "./assets/sprites/player1/"):
-        self.pos = Vec2(*start_pos)
-        self.vel = Vec2(0.0, 0.0)
-        self.acc = Vec2(0.0, 0.0)
-        self.facing = Vec2(1.0, 0.0)
+        self.pos = Vec2(*start_pos)   # vị trí
+        self.vel = Vec2(0.0, 0.0)     # vận tốc
+        self.acc = Vec2(0.0, 0.0)     # gia tốc (từ input)
+        self.facing = Vec2(1.0, 0.0)  # hướng nhìn/di chuyển
 
         self.radius = 16.0
         self.color = color
 
-        self.max_speed = 280.0
-        self.accel = 1200.0
-        self.linear_damping = 4.0  
+        self.max_speed = 280.0       # giới hạn tốc độ tối đa |v|
+        self.accel = 1200.0          # độ lớn gia tốc khi giữ phím
+        self.linear_damping = 4.0    # hệ số giảm chấn tuyến tính
 
         # sprites includes, walk up, down, right(left is flipped)
         self.sprites = {
@@ -66,15 +67,17 @@ class Player:
             if keys.get("down") or keys.get("s"):
                 move_y += 1.0
 
-        move = Vec2(move_x, move_y).normalized()
-        self.acc = move * self.accel
+        move = Vec2(move_x, move_y).normalized()  # chuẩn hoá vector input
+        self.acc = move * self.accel               # a = hướng * độ lớn
 
+        # Tích phân Euler + giảm chấn: v+=a*dt; x+=v*dt; v*= (1 - c*dt)
         new_pos, new_vel = integrate_velocity(self.pos, self.vel, self.acc, dt, self.linear_damping)
 
         if new_vel.length() > self.max_speed:
-            new_vel = new_vel.clamp_length(self.max_speed)
+            new_vel = new_vel.clamp_length(self.max_speed)  # clamp |v| ≤ max_speed
 
         # Pass explicit edges to clamp_to_rect
+        # Chặn ra ngoài biên sân: không nảy (restitution=0)
         new_pos, new_vel = clamp_to_rect(
             new_pos,
             new_vel,
@@ -88,7 +91,7 @@ class Player:
 
         if self.vel.length_sq() > 1e-3:
             vnorm = self.vel.normalized()
-            self.facing = vnorm
+            self.facing = vnorm  # hướng nhìn bám theo hướng vận tốc
 
         if self.vel.length_sq() > 1:  # moving
             # play walk sound
@@ -144,20 +147,21 @@ class Player:
     def attempt_kick(self, ball, sound=None) -> bool:
         if self.kick_timer > 0.0:
             return False
-        # Check tầm
+        # Check tầm: dùng khoảng cách bình phương để tránh sqrt
         delta = Vec2(ball.pos.x - self.pos.x, ball.pos.y - self.pos.y)
         dist_sq = delta.length_sq()
         max_reach = (self.radius + ball.radius + self.kick_extra_range)
         if dist_sq > max_reach * max_reach:
             pg.mixer.Sound("assets/audio/ball_miss.mp3").play()
             return False
-        # Hướng
+        # Hướng: nếu quá gần thì dùng hướng đang facing, ngược lại chuẩn hoá delta
         if dist_sq <= 1e-6:
             direction = self.facing
         else:
             direction = delta.normalized()
+        # Xung sút ~ hướng * lực sút
         impulse = direction * self.kick_power
-        # Vận tốc hiện tại + sút
+        # Cộng thêm một phần vận tốc hiện tại để tạo cảm giác quán tính khi chạy sút
         impulse.x += self.vel.x * 0.25
         impulse.y += self.vel.y * 0.25
         ball.kick((impulse.x, impulse.y))

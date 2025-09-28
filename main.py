@@ -102,7 +102,7 @@ def run():
         PITCH_RECT.bottom,
     )
     pg.init()
-    pg.display.set_caption("Ball Massage")
+    pg.display.set_caption("ManBall")
     
     screen = pg.display.set_mode(SCREEN_SIZE)
     run_start_screen(screen, Path(__file__).parent / "assets")
@@ -221,7 +221,7 @@ def run():
                 return "quit"
             if event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE:
                 return "quit"
-            # Kick inputs
+            #Inputs
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_SPACE:
                     team1_players[active1].attempt_kick(ball, sound_ballhit)
