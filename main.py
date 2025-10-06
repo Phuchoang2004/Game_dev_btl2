@@ -210,7 +210,7 @@ def run():
     score_left = 0
     score_right = 0
 
-    timer = CountdownTimer(6000)
+    timer = CountdownTimer(60000)
 
     camera = (0, 0)
     running = True
